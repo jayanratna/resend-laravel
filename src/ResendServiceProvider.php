@@ -3,10 +3,11 @@
 namespace Resend\Laravel;
 
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
-use InvalidArgumentException;
 use Resend;
 use Resend\Client;
+use Resend\Laravel\Exceptions\ApiKeyIsMissing;
 use Resend\Laravel\Transport\ResendTransportFactory;
 
 final class ResendServiceProvider extends ServiceProvider
@@ -16,6 +17,7 @@ final class ResendServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        $this->registerRoutes();
         $this->registerPublishing();
 
         Mail::extend('resend', function (array $config = []) {
@@ -51,13 +53,28 @@ final class ResendServiceProvider extends ServiceProvider
             $apiKey = config('resend.api_key');
 
             if (! is_string($apiKey)) {
-                throw new InvalidArgumentException('API key missing');
+                throw ApiKeyIsMissing::create();
             }
 
             return Resend::client($apiKey);
         });
 
         $this->app->alias(Client::class, 'resend');
+    }
+
+    /**
+     * Register the package routes.
+     */
+    protected function registerRoutes(): void
+    {
+        Route::group([
+            'domain' => config('resend.domain', null),
+            'namespace' => 'Resend\Laravel\Http\Controllers',
+            'prefix' => config('resend.path'),
+            'as' => 'resend.',
+        ], function () {
+            $this->loadRoutesFrom(__DIR__ . '/../routes/web.php');
+        });
     }
 
     /**
